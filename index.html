@@ -66,7 +66,7 @@ body{
 .brand-title{ font-weight:800; font-size:15px; }
 .brand-sub{ font-size:11.5px; color:var(--text-dim); font-weight:600; }
 
-.toggle-row{ display:flex; gap:8px; }
+.toggle-row{ display:flex; gap:8px; align-items:center; }
 .pill-toggle{ display:flex; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:3px; box-shadow:var(--shadow); }
 .pill-toggle button{
   border:none; background:transparent; color:var(--text-dim);
@@ -227,6 +227,9 @@ body{
       </div>
     </div>
     <div class="toggle-row">
+      <button id="authBtn" style="background:var(--accent); color:var(--accent-contrast); border:1px solid var(--accent); padding:6px 14px; border-radius:999px; font-weight:800; cursor:pointer; font-size:12px; font-family:'Nunito',sans-serif; box-shadow:var(--shadow);">
+        Login
+      </button>
       <div class="pill-toggle">
         <button id="themeLight">☀</button>
         <button id="themeDark">☾</button>
@@ -368,30 +371,49 @@ body{
 
 <script type="module">
 /* =========================================================
-   1. นำเข้า FIREBASE SDK
+   1. นำเข้า FIREBASE SDK (พร้อม Google Auth)
 ========================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
 
-/* =========================================================
-   👇 นำโค้ด firebaseConfig ของคุณจากขั้นตอนที่ 2 มาวางทับตรงนี้ 👇
-========================================================= */
+// ใส่ config ที่คุณให้มา
 const firebaseConfig = {
   apiKey: "AIzaSyCJjp24WvJeC_uK2amZw-pEOCUmlM23z5Q",
   authDomain: "fam-trading-journey.firebaseapp.com",
   projectId: "fam-trading-journey",
   storageBucket: "fam-trading-journey.firebasestorage.app",
   messagingSenderId: "1024872005870",
-  appId: "1:1024872005870:web:9c562de1e4eff4c195f3ff"
+  appId: "1:1024872005870:web:9c562de1e4eff4c195f3ff",
+  measurementId: "G-ZNP5QHTWVV"
 };
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const auth = getAuth(app);
-let currentUserId = null;
+const googleProvider = new GoogleAuthProvider();
 
+let currentUserId = null;
+let unsubscribeSnapshot = null;
+
+// ผูกปุ่ม Login / Logout
+const authBtn = document.getElementById('authBtn');
+authBtn.addEventListener('click', () => {
+  if (currentUserId) {
+    signOut(auth).then(() => {
+        // เมื่อกดออกจากระบบ ให้รีเซ็ตข้อมูลหน้าจอเป็นค่าว่าง
+        entries = {};
+        renderCalendar();
+        if(activeTab === 'year') renderYearView();
+    });
+  } else {
+    signInWithPopup(auth, googleProvider).catch(err => {
+        console.error("Login failed", err);
+        alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
+    });
+  }
+});
 
 /* =========================================================
    2. ข้อมูลและการแปลภาษา
@@ -422,7 +444,7 @@ const I18N = {
     weekdaysShort: ['จ','อ','พ','พฤ','ศ','ส','อา'],
     weekdaysFull: ['วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์','วันอาทิตย์'],
     yearOffset: 543,
-    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'กำลังทำงานแบบออฟไลน์'
+    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'ทำงานแบบออฟไลน์ (กรุณา Login)'
   },
   en: {
     brandTitle: 'Trading Journal', brandSub: 'US Stocks',
@@ -446,7 +468,7 @@ const I18N = {
     weekdaysShort: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     weekdaysFull: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
     yearOffset: 0,
-    syncOnline: 'Cloud Sync Active', syncOffline: 'Working Offline'
+    syncOnline: 'Cloud Sync Active', syncOffline: 'Working Offline (Please Login)'
   }
 };
 
@@ -471,10 +493,9 @@ function t(key){ return I18N[lang][key]; }
 function yearLabel(y){ return y + t('yearOffset'); }
 
 /* =========================================================
-   3. ฟังก์ชันจัดการข้อมูล (ปรับให้ทำงานร่วมกับ Firebase)
+   3. ฟังก์ชันจัดการข้อมูล
 ========================================================= */
 
-// โหลดจาก LocalStorage ก่อน เพื่อความรวดเร็ว
 async function loadLocalEntries(){
   try{
     const raw = localStorage.getItem(ENTRIES_KEY);
@@ -482,21 +503,20 @@ async function loadLocalEntries(){
   }catch(e){ entries = {}; }
 }
 
-// ฟังการเปลี่ยนแปลงจาก Firebase แบบ Real-time
 function listenToTradingData(uid) {
   const docRef = doc(db, "users", uid);
-  onSnapshot(docRef, (docSnap) => {
+  // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์
+  unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
       entries = docSnap.data().entries || {};
-      // แบ็คอัพลงเครื่องไว้เผื่อเน็ตหลุด
-      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); // สำรองลงเครื่อง
+    } else {
+      entries = {}; // หากเป็น User ใหม่
     }
     
-    // อัปเดต UI สถานะ
     document.getElementById('syncDot').classList.add('online');
     document.getElementById('syncText').textContent = t('syncOnline');
     
-    // รีเฟรชหน้าจอ
     renderCalendar();
     if(activeTab === 'year') renderYearView();
   }, (error) => {
@@ -506,23 +526,24 @@ function listenToTradingData(uid) {
   });
 }
 
-// เซฟข้อมูล (ลงเครื่อง + ขึ้นคลาวด์)
 async function persistEntries(){
-  // 1. เซฟลงเครื่อง (Local Storage) ก่อนเสมอ
+  // 1. เซฟลง Local Storage เพื่อความไว
   try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
   catch(e){ console.error("Local save error:", e); }
 
-  // 2. เซฟขึ้น Firebase ถ้าล็อกอินอยู่
+  // 2. ถ้าล็อกอินอยู่ ให้ซิงค์ขึ้น Firebase ทันที
   if(currentUserId) {
     try {
       const docRef = doc(db, "users", currentUserId);
       await setDoc(docRef, { entries: entries }, { merge: true });
     } catch (e) {
       console.error("Firebase save error:", e);
-      // เปลี่ยนสถานะเป็น Offline 
       document.getElementById('syncDot').classList.remove('online');
       document.getElementById('syncText').textContent = t('syncOffline');
     }
+  } else {
+    // ถ้ายังไม่ได้ล็อกอิน ให้เด้งเตือนเบาๆ
+    alert("คุณยังไม่ได้เข้าสู่ระบบ ข้อมูลจะถูกบันทึกไว้ในเครื่องนี้เท่านั้น (ไม่ซิงค์ข้ามอุปกรณ์)");
   }
 }
 
@@ -593,10 +614,9 @@ function applyStaticTranslations(){
 }
 
 /* =========================================================
-   4. UI RENDERING (Calendar, Modals, Charts)
+   4. UI RENDERING 
 ========================================================= */
 
-/* ---------- CALENDAR ---------- */
 function renderCalendar(){
   document.getElementById('monthTitleBtn').textContent = `${t('months')[viewMonth]} ${yearLabel(viewYear)}`;
 
@@ -677,7 +697,6 @@ function renderMonthSummary(){
   document.getElementById('winRate').textContent = traded ? Math.round((wins/traded)*100) + '%' : '0%';
 }
 
-/* ---------- ENTRY MODAL ---------- */
 function openModal(y, m, d){
   activeDate = dateKey(y, m, d);
   const dateObj = new Date(y, m, d);
@@ -704,7 +723,6 @@ async function saveEntry(){
   if(amountRaw === '' && note === ''){ delete entries[activeDate]; }
   else{ entries[activeDate] = { amount: amountRaw === '' ? 0 : parseFloat(amountRaw), note }; }
   
-  // เรียกใช้ persistEntries แบบใหม่ที่ส่งไป Firebase
   await persistEntries();
   renderCalendar();
   if(activeTab === 'year') renderYearView();
@@ -714,14 +732,12 @@ async function deleteEntry(){
   if(!activeDate) return;
   delete entries[activeDate];
   
-  // เรียกใช้ persistEntries แบบใหม่ที่ส่งไป Firebase
   await persistEntries();
   renderCalendar();
   if(activeTab === 'year') renderYearView();
   closeModal();
 }
 
-/* ---------- MONTH PICKER ---------- */
 function openPicker(){
   pickerYear = viewYear;
   renderPicker();
@@ -746,7 +762,6 @@ function renderPicker(){
   });
 }
 
-/* ---------- YEAR VIEW ---------- */
 function renderYearView(){
   document.getElementById('yearTitle').textContent = String(yearLabel(yearViewYear));
 
@@ -803,7 +818,6 @@ function renderEquityCurve(yearEntries){
 
   const zeroY = yFor(0).toFixed(1);
   const lastVal = points[points.length-1];
-  const lineColorVar = lastVal >= 0 ? 'var(--gain)' : 'var(--loss)';
   const fillHex = lastVal >= 0 ? (theme==='dark' ? '#4FBE83' : '#1E9E63') : (theme==='dark' ? '#E8695A' : '#E14F3D');
   const gridHex = theme === 'dark' ? '#303640' : '#E7E6E1';
   const dimHex = theme === 'dark' ? '#93989F' : '#83837C';
@@ -850,7 +864,6 @@ function renderMonthlyBars(yearEntries){
   wrap.innerHTML = html;
 }
 
-/* ---------- BACKUP: EXPORT / IMPORT ---------- */
 function exportData(){
   const payload = {
     app: 'trading-journal',
@@ -881,7 +894,7 @@ function handleImportFile(file){
       if(!confirm(t('importConfirm'))) return;
 
       Object.assign(entries, incoming);
-      await persistEntries(); // สิ่งนี้จะอัปขึ้น Firebase ด้วย
+      await persistEntries();
       renderCalendar();
       if(activeTab === 'year') renderYearView();
       alert(t('importSuccess'));
@@ -894,9 +907,7 @@ function handleImportFile(file){
 }
 
 document.getElementById('exportBtn').addEventListener('click', exportData);
-document.getElementById('importBtnUI').addEventListener('click', () => {
-  document.getElementById('importFileInput').click();
-});
+document.getElementById('importBtnUI').addEventListener('click', () => { document.getElementById('importFileInput').click(); });
 document.getElementById('importFileInput').addEventListener('change', (e) => {
   const file = e.target.files[0];
   if(file) handleImportFile(file);
@@ -904,24 +915,16 @@ document.getElementById('importFileInput').addEventListener('change', (e) => {
 });
 
 /* ---------- EVENTS ---------- */
-document.getElementById('prevMonthBtn').addEventListener('click', () => {
-  viewMonth--; if(viewMonth < 0){ viewMonth = 11; viewYear--; } renderCalendar();
-});
-document.getElementById('nextMonthBtn').addEventListener('click', () => {
-  viewMonth++; if(viewMonth > 11){ viewMonth = 0; viewYear++; } renderCalendar();
-});
-document.getElementById('todayBtn').addEventListener('click', () => {
-  viewYear = current.getFullYear(); viewMonth = current.getMonth(); renderCalendar();
-});
+document.getElementById('prevMonthBtn').addEventListener('click', () => { viewMonth--; if(viewMonth < 0){ viewMonth = 11; viewYear--; } renderCalendar(); });
+document.getElementById('nextMonthBtn').addEventListener('click', () => { viewMonth++; if(viewMonth > 11){ viewMonth = 0; viewYear++; } renderCalendar(); });
+document.getElementById('todayBtn').addEventListener('click', () => { viewYear = current.getFullYear(); viewMonth = current.getMonth(); renderCalendar(); });
 document.getElementById('monthTitleBtn').addEventListener('click', openPicker);
 document.getElementById('pickerClose').addEventListener('click', closePicker);
 document.getElementById('pickerOverlay').addEventListener('click', (e) => { if(e.target.id === 'pickerOverlay') closePicker(); });
 document.getElementById('pickerPrevYear').addEventListener('click', () => { pickerYear--; renderPicker(); });
 document.getElementById('pickerNextYear').addEventListener('click', () => { pickerYear++; renderPicker(); });
-
 document.getElementById('prevYearBtn').addEventListener('click', () => { yearViewYear--; renderYearView(); });
 document.getElementById('nextYearBtn').addEventListener('click', () => { yearViewYear++; renderYearView(); });
-
 document.getElementById('modalClose').addEventListener('click', closeModal);
 document.getElementById('modalOverlay').addEventListener('click', (e) => { if(e.target.id === 'modalOverlay') closeModal(); });
 document.getElementById('saveBtn').addEventListener('click', saveEntry);
@@ -965,29 +968,38 @@ document.getElementById('themeLight').addEventListener('click', () => switchThem
 document.getElementById('themeDark').addEventListener('click', () => switchTheme('dark'));
 
 /* =========================================================
-   5. INITIALIZATION (เริ่มระบบ)
+   5. INITIALIZATION (เริ่มระบบใหม่)
 ========================================================= */
 (async function init(){
   await loadSettings();
   applyTheme();
   applyStaticTranslations();
   
-  // 1. โหลดข้อมูลจากเครื่องมาแสดงผลก่อนทันที (ให้แอปไว)
   await loadLocalEntries();
   renderCalendar();
 
-  // 2. จัดการ Firebase Authentication 
+  // จัดการการเข้าสู่ระบบแบบ Google
   onAuthStateChanged(auth, (user) => {
     if (user) {
       currentUserId = user.uid;
-      // ล็อกอินแล้ว -> เริ่มดึงข้อมูลจาก Cloud
+      authBtn.textContent = 'Logout';
+      authBtn.style.background = 'var(--surface-muted)';
+      authBtn.style.color = 'var(--text)';
+      authBtn.style.border = '1px solid var(--border)';
+      
+      // ดึงข้อมูลจาก Cloud ที่ตรงกับบัญชี Gmail นี้
       listenToTradingData(user.uid);
     } else {
-      // ยังไม่ล็อกอิน -> ล็อกอินแบบ Anonymous อัตโนมัติ
-      signInAnonymously(auth).catch((error) => {
-        console.error("Auth Error:", error);
-        document.getElementById('syncText').textContent = t('syncOffline');
-      });
+      currentUserId = null;
+      authBtn.textContent = 'Login';
+      authBtn.style.background = 'var(--accent)';
+      authBtn.style.color = 'var(--accent-contrast)';
+      authBtn.style.border = '1px solid var(--accent)';
+      
+      // ถ้ากดออกจากระบบ ให้หยุดดึงข้อมูลจาก Cloud
+      if(unsubscribeSnapshot) unsubscribeSnapshot();
+      document.getElementById('syncDot').classList.remove('online');
+      document.getElementById('syncText').textContent = t('syncOffline');
     }
   });
 
