@@ -397,20 +397,24 @@ const googleProvider = new GoogleAuthProvider();
 let currentUserId = null;
 let unsubscribeSnapshot = null;
 
-// ผูกปุ่ม Login / Logout
 const authBtn = document.getElementById('authBtn');
 authBtn.addEventListener('click', () => {
   if (currentUserId) {
     signOut(auth).then(() => {
-        // เมื่อกดออกจากระบบ ให้รีเซ็ตข้อมูลหน้าจอเป็นค่าว่าง
         entries = {};
         renderCalendar();
         if(activeTab === 'year') renderYearView();
     });
   } else {
+    // --- เพิ่มโค้ดส่วนนี้เข้าไปครับ ---
+    googleProvider.setCustomParameters({
+      prompt: 'select_account'
+    });
+    // -----------------------------
+    
     signInWithPopup(auth, googleProvider).catch(err => {
         console.error("Login failed", err);
-        alert("เข้าสู่ระบบไม่สำเร็จ..: " + err.message);
+        alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
     });
   }
 });
