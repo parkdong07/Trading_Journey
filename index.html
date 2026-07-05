@@ -152,7 +152,7 @@ body{
 .bar-label{ font-size:9.5px; color:var(--text-dim); margin-top:6px; font-weight:700; }
 .status-msg{ text-align:center; color:var(--text-dim); font-size:12px; padding:20px; }
 
-/* Modal (entry + picker share styles) */
+/* Modal */
 .modal-overlay{ position:fixed; inset:0; background:var(--overlay); display:none; align-items:flex-end; justify-content:center; z-index:50; }
 .modal-overlay.open{ display:flex; }
 .modal{ background:var(--surface); border-radius:18px 18px 0 0; width:100%; max-width:480px; padding:22px; animation:slideUp 0.18s ease-out; }
@@ -186,6 +186,22 @@ body{
   padding:6px 12px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow);
 }
 .backup-btn:hover{ color:var(--text); border-color:var(--accent); }
+
+/* Sync Status indicator */
+.sync-status {
+  font-size: 11px;
+  color: var(--text-dim);
+  text-align: center;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.sync-dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim);
+}
+.sync-dot.online { background: var(--gain); box-shadow: 0 0 4px var(--gain); }
 
 /* Month/year picker */
 .picker-year-row{ display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:16px; }
@@ -227,7 +243,6 @@ body{
     <button class="tab-btn" id="tabYearBtn"><span id="t-tabYear">Year Summary</span></button>
   </div>
 
-  <!-- CALENDAR VIEW -->
   <div id="calendarView">
     <div class="stat-grid">
       <div class="stat-card main">
@@ -261,7 +276,6 @@ body{
     </div>
   </div>
 
-  <!-- YEAR VIEW -->
   <div id="yearView" class="hidden">
     <div class="nav-row">
       <button class="nav-btn" id="prevYearBtn">‹</button>
@@ -313,9 +327,13 @@ body{
     <button class="backup-btn" id="importBtnUI">⬆ <span id="t-importBtn">Import</span></button>
     <input type="file" id="importFileInput" accept="application/json" style="display:none">
   </div>
+  
+  <div class="sync-status">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncText">Connecting...</span>
+  </div>
 </div>
 
-<!-- Entry modal -->
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
@@ -333,7 +351,6 @@ body{
   </div>
 </div>
 
-<!-- Month picker modal -->
 <div class="modal-overlay" id="pickerOverlay">
   <div class="modal">
     <div class="modal-header">
@@ -349,7 +366,36 @@ body{
   </div>
 </div>
 
-<script>
+<script type="module">
+/* =========================================================
+   1. นำเข้า FIREBASE SDK
+========================================================= */
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
+
+/* =========================================================
+   👇 นำโค้ด firebaseConfig ของคุณจากขั้นตอนที่ 2 มาวางทับตรงนี้ 👇
+========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCJjp24WvJeC_uK2amZw-pEOCUmlM23z5Q",
+  authDomain: "fam-trading-journey.firebaseapp.com",
+  projectId: "fam-trading-journey",
+  storageBucket: "fam-trading-journey.firebasestorage.app",
+  messagingSenderId: "1024872005870",
+  appId: "1:1024872005870:web:9c562de1e4eff4c195f3ff"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const auth = getAuth(app);
+let currentUserId = null;
+
+
+/* =========================================================
+   2. ข้อมูลและการแปลภาษา
+========================================================= */
 const ENTRIES_KEY = 'trading-entries';
 const SETTINGS_KEY = 'app-settings';
 
@@ -375,7 +421,8 @@ const I18N = {
     monthsShort: ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'],
     weekdaysShort: ['จ','อ','พ','พฤ','ศ','ส','อา'],
     weekdaysFull: ['วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์','วันอาทิตย์'],
-    yearOffset: 543
+    yearOffset: 543,
+    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'กำลังทำงานแบบออฟไลน์'
   },
   en: {
     brandTitle: 'Trading Journal', brandSub: 'US Stocks',
@@ -398,7 +445,8 @@ const I18N = {
     monthsShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     weekdaysShort: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
     weekdaysFull: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
-    yearOffset: 0
+    yearOffset: 0,
+    syncOnline: 'Cloud Sync Active', syncOffline: 'Working Offline'
   }
 };
 
@@ -422,16 +470,62 @@ function fmtMoney(n){
 function t(key){ return I18N[lang][key]; }
 function yearLabel(y){ return y + t('yearOffset'); }
 
-async function loadEntries(){
+/* =========================================================
+   3. ฟังก์ชันจัดการข้อมูล (ปรับให้ทำงานร่วมกับ Firebase)
+========================================================= */
+
+// โหลดจาก LocalStorage ก่อน เพื่อความรวดเร็ว
+async function loadLocalEntries(){
   try{
     const raw = localStorage.getItem(ENTRIES_KEY);
-    entries = raw ? JSON.parse(raw) : {};
+    if(raw) entries = JSON.parse(raw);
   }catch(e){ entries = {}; }
 }
-async function persistEntries(){
-  try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
-  catch(e){ console.error(e); alert(t('saveFail')); }
+
+// ฟังการเปลี่ยนแปลงจาก Firebase แบบ Real-time
+function listenToTradingData(uid) {
+  const docRef = doc(db, "users", uid);
+  onSnapshot(docRef, (docSnap) => {
+    if (docSnap.exists()) {
+      entries = docSnap.data().entries || {};
+      // แบ็คอัพลงเครื่องไว้เผื่อเน็ตหลุด
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
+    }
+    
+    // อัปเดต UI สถานะ
+    document.getElementById('syncDot').classList.add('online');
+    document.getElementById('syncText').textContent = t('syncOnline');
+    
+    // รีเฟรชหน้าจอ
+    renderCalendar();
+    if(activeTab === 'year') renderYearView();
+  }, (error) => {
+    console.error("Firebase Sync Error:", error);
+    document.getElementById('syncDot').classList.remove('online');
+    document.getElementById('syncText').textContent = t('syncOffline');
+  });
 }
+
+// เซฟข้อมูล (ลงเครื่อง + ขึ้นคลาวด์)
+async function persistEntries(){
+  // 1. เซฟลงเครื่อง (Local Storage) ก่อนเสมอ
+  try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
+  catch(e){ console.error("Local save error:", e); }
+
+  // 2. เซฟขึ้น Firebase ถ้าล็อกอินอยู่
+  if(currentUserId) {
+    try {
+      const docRef = doc(db, "users", currentUserId);
+      await setDoc(docRef, { entries: entries }, { merge: true });
+    } catch (e) {
+      console.error("Firebase save error:", e);
+      // เปลี่ยนสถานะเป็น Offline 
+      document.getElementById('syncDot').classList.remove('online');
+      document.getElementById('syncText').textContent = t('syncOffline');
+    }
+  }
+}
+
 async function loadSettings(){
   try{
     const raw = localStorage.getItem(SETTINGS_KEY);
@@ -479,6 +573,12 @@ function applyStaticTranslations(){
   document.getElementById('t-backupLabel').textContent = t('backupLabel');
   document.getElementById('t-exportBtn').textContent = t('exportBtn');
   document.getElementById('t-importBtn').textContent = t('importBtn');
+  
+  if(document.getElementById('syncDot').classList.contains('online')) {
+    document.getElementById('syncText').textContent = t('syncOnline');
+  } else {
+    document.getElementById('syncText').textContent = t('syncOffline');
+  }
 
   document.getElementById('langTH').classList.toggle('active', lang==='th');
   document.getElementById('langEN').classList.toggle('active', lang==='en');
@@ -491,6 +591,10 @@ function applyStaticTranslations(){
     wdRow.appendChild(d);
   });
 }
+
+/* =========================================================
+   4. UI RENDERING (Calendar, Modals, Charts)
+========================================================= */
 
 /* ---------- CALENDAR ---------- */
 function renderCalendar(){
@@ -532,7 +636,7 @@ function renderCalendar(){
     num.textContent = d;
     cell.appendChild(num);
 
-    if(entry && entry.amount){
+    if(entry && entry.amount !== undefined){
       const amt = Number(entry.amount) || 0;
       const amountEl = document.createElement('div');
       amountEl.className = 'day-amount ' + (amt >= 0 ? 'gain' : 'loss');
@@ -599,6 +703,8 @@ async function saveEntry(){
   const note = document.getElementById('noteInput').value.trim();
   if(amountRaw === '' && note === ''){ delete entries[activeDate]; }
   else{ entries[activeDate] = { amount: amountRaw === '' ? 0 : parseFloat(amountRaw), note }; }
+  
+  // เรียกใช้ persistEntries แบบใหม่ที่ส่งไป Firebase
   await persistEntries();
   renderCalendar();
   if(activeTab === 'year') renderYearView();
@@ -607,6 +713,8 @@ async function saveEntry(){
 async function deleteEntry(){
   if(!activeDate) return;
   delete entries[activeDate];
+  
+  // เรียกใช้ persistEntries แบบใหม่ที่ส่งไป Firebase
   await persistEntries();
   renderCalendar();
   if(activeTab === 'year') renderYearView();
@@ -773,7 +881,7 @@ function handleImportFile(file){
       if(!confirm(t('importConfirm'))) return;
 
       Object.assign(entries, incoming);
-      await persistEntries();
+      await persistEntries(); // สิ่งนี้จะอัปขึ้น Firebase ด้วย
       renderCalendar();
       if(activeTab === 'year') renderYearView();
       alert(t('importSuccess'));
@@ -856,12 +964,33 @@ async function switchTheme(newTheme){
 document.getElementById('themeLight').addEventListener('click', () => switchTheme('light'));
 document.getElementById('themeDark').addEventListener('click', () => switchTheme('dark'));
 
+/* =========================================================
+   5. INITIALIZATION (เริ่มระบบ)
+========================================================= */
 (async function init(){
   await loadSettings();
-  await loadEntries();
   applyTheme();
   applyStaticTranslations();
+  
+  // 1. โหลดข้อมูลจากเครื่องมาแสดงผลก่อนทันที (ให้แอปไว)
+  await loadLocalEntries();
   renderCalendar();
+
+  // 2. จัดการ Firebase Authentication 
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      currentUserId = user.uid;
+      // ล็อกอินแล้ว -> เริ่มดึงข้อมูลจาก Cloud
+      listenToTradingData(user.uid);
+    } else {
+      // ยังไม่ล็อกอิน -> ล็อกอินแบบ Anonymous อัตโนมัติ
+      signInAnonymously(auth).catch((error) => {
+        console.error("Auth Error:", error);
+        document.getElementById('syncText').textContent = t('syncOffline');
+      });
+    }
+  });
+
 })();
 </script>
 </body>
