@@ -410,7 +410,7 @@ authBtn.addEventListener('click', () => {
   } else {
     signInWithPopup(auth, googleProvider).catch(err => {
         console.error("Login failed", err);
-        alert("เข้าสู่ระบบไม่สำเร็จ: " + err.message);
+        alert("เข้าสู่ระบบไม่สำเร็จ..: " + err.message);
     });
   }
 });
