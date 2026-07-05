@@ -226,16 +226,19 @@ body{
         <div class="brand-sub" id="t-brandSub">US Stocks</div>
       </div>
     </div>
-    
     <div class="toggle-row">
+      
       <div style="display:flex; gap:4px; align-items:center; background:var(--surface); padding:2px 4px; border-radius:999px; border:1px solid var(--border); box-shadow:var(--shadow);">
         <input type="text" id="syncIdInput" placeholder="รหัสซิงค์" style="width: 80px; padding: 4px 8px; border:none; background:transparent; color:var(--text); font-family:'Nunito',sans-serif; font-size:12px; font-weight:700; outline:none;">
         <button id="applySyncBtn" style="background:var(--accent); color:var(--accent-contrast); border:none; padding:4px 10px; border-radius:999px; font-weight:800; cursor:pointer; font-size:11px;">เชื่อมต่อ</button>
       </div>
-
       <div class="pill-toggle">
         <button id="themeLight">☀</button>
         <button id="themeDark">☾</button>
+      </div>
+      <div class="pill-toggle">
+        <button id="langTH">TH</button>
+        <button id="langEN">EN</button>
       </div>
     </div>
   </div>
@@ -370,12 +373,12 @@ body{
 
 <script type="module">
 /* =========================================================
-   1. นำเข้า FIREBASE SDK
+   1. นำเข้า FIREBASE SDK (เอา Auth ออก ใช้แค่ Firestore)
 ========================================================= */
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
 import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
 
-// Config เดิมของคุณ
+// ใส่ config ที่คุณให้มา
 const firebaseConfig = {
   apiKey: "AIzaSyCJjp24WvJeC_uK2amZw-pEOCUmlM23z5Q",
   authDomain: "fam-trading-journey.firebaseapp.com",
@@ -386,27 +389,25 @@ const firebaseConfig = {
   measurementId: "G-ZNP5QHTWVV"
 };
 
+// Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// จัดการรหัส Sync (ให้ระบบสุ่มเลขให้จำง่ายๆ เช่น mytrade_1234)
+// จัดการรหัส Sync ID
 let deviceId = localStorage.getItem('trading-device-id');
 if (!deviceId) {
   deviceId = 'ID' + Math.floor(Math.random() * 99999);
   localStorage.setItem('trading-device-id', deviceId);
 }
-// แสดงรหัสในช่อง
 document.getElementById('syncIdInput').value = deviceId;
-
 let unsubscribeSnapshot = null;
 
-// เมื่อกดปุ่มเชื่อมต่อซิงค์
+// กดปุ่มเชื่อมต่อรหัสซิงค์
 document.getElementById('applySyncBtn').addEventListener('click', () => {
   const newId = document.getElementById('syncIdInput').value.trim();
   if(newId) {
     deviceId = newId;
     localStorage.setItem('trading-device-id', deviceId);
-    // ถอดการเชื่อมต่ออันเก่า แล้วโหลดอันใหม่
     if(unsubscribeSnapshot) unsubscribeSnapshot();
     listenToTradingData();
     alert('เชื่อมต่อรหัสส่วนตัว: ' + deviceId + ' เรียบร้อยแล้ว!');
@@ -414,6 +415,7 @@ document.getElementById('applySyncBtn').addEventListener('click', () => {
     alert('กรุณาใส่รหัสซิงค์');
   }
 });
+
 
 /* =========================================================
    2. ข้อมูลและการแปลภาษา
@@ -437,14 +439,14 @@ const I18N = {
     saveFail: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
     pickerTitle: 'เลือกเดือน',
     backupLabel: 'สำรองข้อมูล', exportBtn: 'ส่งออกไฟล์', importBtn: 'นำเข้าไฟล์',
-    importConfirm: 'ไฟล์นี้จะรวมเข้ากับข้อมูลปัจจุบันของคุณ ต้องการดำเนินการต่อหรือไม่?',
-    importSuccess: 'นำเข้าข้อมูลสำเร็จ', importFail: 'ไฟล์ไม่ถูกต้อง',
+    importConfirm: 'ไฟล์นี้จะรวมเข้ากับข้อมูลปัจจุบันของคุณ (ถ้าวันที่ซ้ำกัน ข้อมูลในไฟล์จะทับของเดิม) ต้องการดำเนินการต่อหรือไม่?',
+    importSuccess: 'นำเข้าข้อมูลสำเร็จ', importFail: 'ไฟล์ไม่ถูกต้องหรือเสียหาย กรุณาตรวจสอบไฟล์อีกครั้ง',
     months: ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],
     monthsShort: ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'],
     weekdaysShort: ['จ','อ','พ','พฤ','ศ','ส','อา'],
     weekdaysFull: ['วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์','วันอาทิตย์'],
     yearOffset: 543,
-    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'กำลังทำงานแบบออฟไลน์'
+    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'ทำงานแบบออฟไลน์'
   },
   en: {
     brandTitle: 'Trading Journal', brandSub: 'US Stocks',
@@ -452,7 +454,7 @@ const I18N = {
     monthPnl: "This Month's P&L", winDays: 'Win Days', lossDays: 'Loss Days', winRate: 'Win Rate',
     today: 'Today',
     pnlLabel: 'P&L (USD)', pnlPlaceholder: 'e.g. 150 or -80',
-    noteLabel: 'Note', notePlaceholder: 'e.g. Long AAPL on breakout',
+    noteLabel: 'Note', notePlaceholder: 'e.g. Long AAPL on breakout, exited too early',
     save: 'Save', delete: 'Delete',
     yearPnl: 'Total P&L This Year', tradingDays: 'Trading Days', winRate2: 'Win Rate',
     bestDay: 'Best Day', worstDay: 'Worst Day', lossDays2: 'Loss Days',
@@ -461,8 +463,8 @@ const I18N = {
     saveFail: 'Failed to save. Please try again.',
     pickerTitle: 'Select Month',
     backupLabel: 'Backup', exportBtn: 'Export File', importBtn: 'Import File',
-    importConfirm: 'This file will be merged into your current data. Continue?',
-    importSuccess: 'Data imported successfully', importFail: 'Invalid file.',
+    importConfirm: 'This file will be merged into your current data (matching dates will be overwritten by the file). Continue?',
+    importSuccess: 'Data imported successfully', importFail: 'Invalid or corrupted file. Please check the file and try again.',
     months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
     monthsShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
     weekdaysShort: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
@@ -493,7 +495,7 @@ function t(key){ return I18N[lang][key]; }
 function yearLabel(y){ return y + t('yearOffset'); }
 
 /* =========================================================
-   3. ฟังก์ชันจัดการข้อมูล (SYNC อัตโนมัติด้วย DEVICE ID)
+   3. ฟังก์ชันจัดการข้อมูล (เปลี่ยนมาใช้ Device ID)
 ========================================================= */
 
 async function loadLocalEntries(){
@@ -505,14 +507,14 @@ async function loadLocalEntries(){
 
 function listenToTradingData() {
   const docRef = doc(db, "users", deviceId);
+  // ฟังการเปลี่ยนแปลงข้อมูลแบบเรียลไทม์ผ่าน Device ID
   unsubscribeSnapshot = onSnapshot(docRef, (docSnap) => {
     if (docSnap.exists()) {
       entries = docSnap.data().entries || {};
-      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); 
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); // สำรองลงเครื่อง
     } else {
-      // ถ้าเปลี่ยนเป็นไอดีใหม่ที่ยังไม่มีข้อมูล ให้เป็นค่าว่าง
       entries = {}; 
-      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); 
+      localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries));
     }
     
     document.getElementById('syncDot').classList.add('online');
@@ -528,9 +530,11 @@ function listenToTradingData() {
 }
 
 async function persistEntries(){
+  // 1. เซฟลง Local Storage เพื่อความไว
   try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
   catch(e){ console.error("Local save error:", e); }
 
+  // 2. ซิงค์ขึ้น Firebase ด้วย Device ID
   try {
     const docRef = doc(db, "users", deviceId);
     await setDoc(docRef, { entries: entries }, { merge: true });
@@ -972,7 +976,7 @@ document.getElementById('themeDark').addEventListener('click', () => switchTheme
   await loadLocalEntries();
   renderCalendar();
 
-  // เริ่มทำการดึงข้อมูลจากฐานข้อมูลอัตโนมัติ
+  // เรียกใช้ฟังก์ชันซิงค์ข้อมูลผ่านรหัสทันที
   listenToTradingData();
 })();
 </script>
