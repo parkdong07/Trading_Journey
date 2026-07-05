@@ -592,7 +592,10 @@ async function persistEntries(){
 
   if(passHash){
     try{
-      await db.collection('journals').doc(passHash).set({ entries }, { merge:true });
+      // ไม่ใช้ merge:true เพราะ Firestore จะ deep-merge field ที่เป็น map
+      // ทำให้ข้อมูลที่ถูกลบในเครื่องไม่ถูกลบออกจาก Cloud (ค้างอยู่แล้วซิงค์กลับมา)
+      // เขียนทับทั้งก้อนแทน เพราะ entries ในเครื่องคือสถานะล่าสุดที่ถูกต้องเสมอ
+      await db.collection('journals').doc(passHash).set({ entries });
     }catch(e){
       console.error('Firestore save error', e);
       setSyncStatus('error');
