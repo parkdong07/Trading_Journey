@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Trading Journal / สมุดบันทึกกำไรขาดทุน</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root{
+  --bg: #F7F7F5;
+  --surface: #FFFFFF;
+  --surface-muted: #F1F1EE;
+  --border: #E7E6E1;
+  --text: #24251F;
+  --text-dim: #83837C;
+  --gain: #1E9E63;
+  --gain-soft: #E6F6EE;
+  --loss: #E14F3D;
+  --loss-soft: #FCEAE7;
+  --accent: #3E6259;
+  --accent-contrast: #FFFFFF;
+  --shadow: 0 1px 2px rgba(20,20,15,0.04), 0 4px 16px rgba(20,20,15,0.04);
+  --overlay: rgba(20,20,15,0.45);
+}
+[data-theme="dark"]{
+  --bg: #15181C;
+  --surface: #1D2126;
+  --surface-muted: #262B31;
+  --border: #303640;
+  --text: #ECEAE3;
+  --text-dim: #93989F;
+  --gain: #4FBE83;
+  --gain-soft: rgba(79,190,131,0.14);
+  --loss: #E8695A;
+  --loss-soft: rgba(232,105,90,0.15);
+  --accent: #67A794;
+  --accent-contrast: #10201C;
+  --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 16px rgba(0,0,0,0.25);
+  --overlay: rgba(0,0,0,0.6);
+}
+
+*{ box-sizing:border-box; }
+@media (prefers-reduced-motion: reduce){ *{ animation:none !important; transition:none !important; } }
+
+body{
+  margin:0;
+  background:var(--bg);
+  color:var(--text);
+  font-family:'Nunito',sans-serif;
+  -webkit-font-smoothing:antialiased;
+  transition:background 0.2s ease, color 0.2s ease;
+}
+
+.app{ max-width:760px; margin:0 auto; padding:20px 16px 56px; }
+
+/* Topbar */
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+.brand{ display:flex; align-items:center; gap:10px; }
+.brand-mark{
+  font-weight:800; font-size:14px; color:var(--accent-contrast);
+  background:var(--accent); width:34px; height:34px; border-radius:10px;
+  display:flex; align-items:center; justify-content:center; letter-spacing:-0.02em;
+}
+.brand-text{ display:flex; flex-direction:column; }
+.brand-title{ font-weight:800; font-size:15px; }
+.brand-sub{ font-size:11.5px; color:var(--text-dim); font-weight:600; }
+
+.toggle-row{ display:flex; gap:8px; }
+.pill-toggle{ display:flex; background:var(--surface); border:1px solid var(--border); border-radius:999px; padding:3px; box-shadow:var(--shadow); }
+.pill-toggle button{
+  border:none; background:transparent; color:var(--text-dim);
+  font-weight:800; font-size:12px; padding:6px 11px; border-radius:999px; cursor:pointer;
+}
+.pill-toggle button.active{ background:var(--accent); color:var(--accent-contrast); }
+
+/* Tabs */
+.tabs{ display:flex; gap:4px; border-bottom:1px solid var(--border); margin-bottom:18px; }
+.tab-btn{
+  border:none; background:none; font-weight:800; font-size:13.5px; color:var(--text-dim);
+  padding:10px 4px; margin-right:18px; cursor:pointer; border-bottom:2px solid transparent; position:relative; top:1px;
+}
+.tab-btn.active{ color:var(--text); border-bottom-color:var(--accent); }
+.hidden{ display:none !important; }
+
+/* Stat cards */
+.stat-grid{ display:grid; grid-template-columns:1.3fr 1fr 1fr 1fr; gap:10px; margin-bottom:18px; }
+.stat-grid.year-grid{ grid-template-columns:repeat(3,1fr); }
+.stat-card{ background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:13px 12px; box-shadow:var(--shadow); }
+.stat-label{ font-size:11px; color:var(--text-dim); margin-bottom:6px; white-space:nowrap; font-weight:700; }
+.stat-value{ font-family:'IBM Plex Mono',monospace; font-size:17px; font-weight:600; }
+.stat-value.gain{ color:var(--gain); }
+.stat-value.loss{ color:var(--loss); }
+.stat-card.main .stat-value{ font-size:19px; }
+@media (max-width:440px){ .stat-grid, .stat-grid.year-grid{ grid-template-columns:1fr 1fr; } }
+
+/* Nav row */
+.nav-row{ display:flex; align-items:center; gap:8px; margin-bottom:12px; }
+.nav-title-btn{
+  font-family:'Nunito',sans-serif; font-size:18px; font-weight:800; flex:1; text-align:center;
+  background:none; border:none; color:var(--text); cursor:pointer; padding:6px; border-radius:8px;
+}
+.nav-title-btn:hover{ background:var(--surface-muted); }
+.nav-btn{
+  background:var(--surface); border:1px solid var(--border); color:var(--text);
+  width:32px; height:32px; border-radius:9px; font-size:15px; cursor:pointer;
+  display:flex; align-items:center; justify-content:center; box-shadow:var(--shadow);
+}
+.nav-btn:hover{ border-color:var(--accent); }
+.today-btn{
+  background:var(--surface); border:1px solid var(--border); color:var(--text-dim); font-weight:700;
+  font-size:12px; padding:0 12px; height:32px; border-radius:9px; cursor:pointer; box-shadow:var(--shadow);
+}
+.today-btn:hover{ color:var(--text); border-color:var(--accent); }
+
+/* Weekday header + grid */
+.weekdays{ display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:6px; }
+.weekdays div{ text-align:center; font-size:11px; color:var(--text-dim); padding:4px 0; font-weight:700; }
+
+.calendar-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:6px; }
+.day-cell{
+  aspect-ratio:1/1; background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:6px 5px; cursor:pointer; display:flex; flex-direction:column; justify-content:space-between; position:relative;
+}
+.day-cell:hover{ border-color:var(--accent); }
+.day-cell:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+.day-cell.empty{ background:transparent; border-color:transparent; cursor:default; box-shadow:none; }
+.day-cell.weekend{ opacity:0.5; }
+.day-cell.today{ border-color:var(--accent); border-width:1.5px; }
+.day-cell.has-gain{ background:var(--gain-soft); }
+.day-cell.has-loss{ background:var(--loss-soft); }
+
+.day-num{ font-size:13px; font-weight:700; color:var(--text-dim); }
+.day-cell.has-gain .day-num, .day-cell.has-loss .day-num{ color:var(--text); }
+.day-amount{ font-family:'IBM Plex Mono',monospace; font-size:10.5px; font-weight:600; line-height:1.2; word-break:break-all; }
+.day-amount.gain{ color:var(--gain); }
+.day-amount.loss{ color:var(--loss); }
+.day-note-dot{ width:5px; height:5px; border-radius:50%; background:var(--accent); position:absolute; top:6px; right:6px; }
+@media (max-width:380px){ .day-num{ font-size:11px; } .day-amount{ font-size:9px; } }
+
+/* Year view cards */
+.card{ background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:16px; box-shadow:var(--shadow); margin-bottom:16px; }
+.card-title{ font-weight:800; font-size:14px; margin-bottom:12px; }
+.empty-state{ text-align:center; color:var(--text-dim); font-size:13px; padding:30px 10px; }
+.equity-svg{ width:100%; height:auto; display:block; }
+.bar-chart{ display:flex; align-items:flex-end; gap:5px; height:120px; }
+.bar-col{ flex:1; display:flex; flex-direction:column; align-items:center; justify-content:flex-end; height:100%; }
+.bar{ width:100%; border-radius:4px 4px 2px 2px; min-height:2px; }
+.bar.gain{ background:var(--gain); }
+.bar.loss{ background:var(--loss); }
+.bar.zero{ background:var(--border); }
+.bar-label{ font-size:9.5px; color:var(--text-dim); margin-top:6px; font-weight:700; }
+.status-msg{ text-align:center; color:var(--text-dim); font-size:12px; padding:20px; }
+
+/* Modal (entry + picker share styles) */
+.modal-overlay{ position:fixed; inset:0; background:var(--overlay); display:none; align-items:flex-end; justify-content:center; z-index:50; }
+.modal-overlay.open{ display:flex; }
+.modal{ background:var(--surface); border-radius:18px 18px 0 0; width:100%; max-width:480px; padding:22px; animation:slideUp 0.18s ease-out; }
+@media (min-width:520px){ .modal-overlay{ align-items:center; } .modal{ border-radius:16px; } }
+@keyframes slideUp{ from{ transform:translateY(24px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+.modal-header{ display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
+.modal-date{ font-size:16.5px; font-weight:800; }
+.modal-close{ background:none; border:none; color:var(--text-dim); font-size:22px; cursor:pointer; line-height:1; }
+.modal label{ display:block; font-size:12px; color:var(--text-dim); margin-bottom:6px; margin-top:14px; font-weight:700; }
+.modal input, .modal textarea{
+  width:100%; background:var(--surface-muted); border:1px solid var(--border); color:var(--text);
+  border-radius:10px; padding:10px 12px; font-family:'IBM Plex Mono',monospace; font-size:14px; resize:vertical;
+}
+.modal textarea{ font-family:'Nunito',sans-serif; font-size:13.5px; }
+.modal input:focus, .modal textarea:focus{ outline:none; border-color:var(--accent); }
+.modal-actions{ display:flex; gap:10px; margin-top:20px; }
+.btn-primary, .btn-ghost{ flex:1; padding:11px; border-radius:10px; font-size:14px; font-weight:700; cursor:pointer; border:1px solid var(--border); font-family:'Nunito',sans-serif; }
+.btn-primary{ background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+.btn-ghost{ background:transparent; color:var(--loss); }
+
+/* Backup row */
+.backup-row{
+  display:flex; align-items:center; justify-content:center; gap:10px;
+  margin-top:8px; padding-top:16px; border-top:1px solid var(--border);
+  flex-wrap:wrap;
+}
+.backup-label{ font-size:11.5px; color:var(--text-dim); font-weight:700; }
+.backup-btn{
+  background:var(--surface); border:1px solid var(--border); color:var(--text-dim);
+  font-family:'Nunito',sans-serif; font-weight:700; font-size:12px;
+  padding:6px 12px; border-radius:999px; cursor:pointer; box-shadow:var(--shadow);
+}
+.backup-btn:hover{ color:var(--text); border-color:var(--accent); }
+
+/* Sync status indicator */
+.sync-status{
+  font-size:11px; color:var(--text-dim); text-align:center;
+  margin-top:10px; display:flex; align-items:center; justify-content:center; gap:5px;
+}
+.sync-dot{ width:6px; height:6px; border-radius:50%; background:var(--text-dim); }
+.sync-dot.online{ background:var(--gain); box-shadow:0 0 4px var(--gain); }
+.sync-dot.error{ background:var(--loss); box-shadow:0 0 4px var(--loss); }
+
+/* Month/year picker */
+.picker-year-row{ display:flex; align-items:center; justify-content:center; gap:16px; margin-bottom:16px; }
+.picker-year-label{ font-size:17px; font-weight:800; min-width:64px; text-align:center; }
+.month-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+.month-opt{
+  background:var(--surface-muted); border:1px solid var(--border); color:var(--text);
+  padding:12px 4px; border-radius:10px; font-family:'Nunito',sans-serif; font-weight:700; font-size:13px; cursor:pointer;
+}
+.month-opt:hover{ border-color:var(--accent); }
+.month-opt.current{ background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+.month-opt.current{ background:var(--accent); color:var(--accent-contrast); border-color:var(--accent); }
+
+/* Passcode gate */
+.passcode-desc{ font-size:13px; color:var(--text-dim); line-height:1.5; margin-bottom:4px; }
+</style>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<!-- Passcode gate -->
+<div class="modal-overlay open" id="passcodeOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-date" id="t-passcodeTitle">Enter Passcode</div>
+    </div>
+    <p class="passcode-desc" id="t-passcodeDesc">Set your own passcode. Use the same one on every device to see the same data.</p>
+    <label for="passcodeInput" id="t-passcodeLabel">Passcode</label>
+    <input type="password" id="passcodeInput" placeholder="e.g. sunset-trader-2026" autocomplete="off">
+    <div class="modal-actions">
+      <button class="btn-primary" id="passcodeContinue" style="flex:1">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="topbar">
+    <div class="brand">
+      <div class="brand-mark">P/L</div>
+      <div class="brand-text">
+        <div class="brand-title" id="t-brandTitle">Trading Journal</div>
+        <div class="brand-sub" id="t-brandSub">US Stocks</div>
+      </div>
+    </div>
+    <div class="toggle-row">
+      <div class="pill-toggle">
+        <button id="themeLight">☀</button>
+        <button id="themeDark">☾</button>
+      </div>
+      <div class="pill-toggle">
+        <button id="langTH">TH</button>
+        <button id="langEN">EN</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tabCalendarBtn"><span id="t-tabCalendar">Calendar</span></button>
+    <button class="tab-btn" id="tabYearBtn"><span id="t-tabYear">Year Summary</span></button>
+  </div>
+
+  <!-- CALENDAR VIEW -->
+  <div id="calendarView">
+    <div class="stat-grid">
+      <div class="stat-card main">
+        <div class="stat-label" id="t-monthPnl">This Month's P&amp;L</div>
+        <div class="stat-value" id="monthTotal">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-winDays">Win Days</div>
+        <div class="stat-value gain" id="winDays">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-lossDays">Loss Days</div>
+        <div class="stat-value loss" id="lossDays">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-winRate">Win Rate</div>
+        <div class="stat-value" id="winRate">0%</div>
+      </div>
+    </div>
+
+    <div class="nav-row">
+      <button class="nav-btn" id="prevMonthBtn">‹</button>
+      <button class="nav-title-btn" id="monthTitleBtn">—</button>
+      <button class="nav-btn" id="nextMonthBtn">›</button>
+      <button class="today-btn" id="todayBtn">Today</button>
+    </div>
+
+    <div class="weekdays" id="weekdaysRow"></div>
+    <div class="calendar-grid" id="calendarGrid">
+      <div class="status-msg">Loading…</div>
+    </div>
+  </div>
+
+  <!-- YEAR VIEW -->
+  <div id="yearView" class="hidden">
+    <div class="nav-row">
+      <button class="nav-btn" id="prevYearBtn">‹</button>
+      <div class="nav-title-btn" style="cursor:default;" id="yearTitle">—</div>
+      <button class="nav-btn" id="nextYearBtn">›</button>
+    </div>
+
+    <div class="stat-grid year-grid">
+      <div class="stat-card main">
+        <div class="stat-label" id="t-yearPnl">Total P&amp;L This Year</div>
+        <div class="stat-value" id="yearTotal">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-tradingDays">Trading Days</div>
+        <div class="stat-value" id="yearTradingDays">0</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-winRate2">Win Rate</div>
+        <div class="stat-value" id="yearWinRate">0%</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-bestDay">Best Day</div>
+        <div class="stat-value gain" id="yearBest">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-worstDay">Worst Day</div>
+        <div class="stat-value loss" id="yearWorst">$0.00</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label" id="t-lossDays2">Loss Days</div>
+        <div class="stat-value loss" id="yearLossDays">0</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" id="t-equityCurve">Equity Curve</div>
+      <div id="equityChartWrap"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-title" id="t-monthlyBreakdown">Monthly Breakdown</div>
+      <div id="barChartWrap"></div>
+    </div>
+  </div>
+
+  <div class="backup-row">
+    <span class="backup-label" id="t-backupLabel">Backup</span>
+    <button class="backup-btn" id="exportBtn">⬇ <span id="t-exportBtn">Export</span></button>
+    <button class="backup-btn" id="importBtnUI">⬆ <span id="t-importBtn">Import</span></button>
+    <input type="file" id="importFileInput" accept="application/json" style="display:none">
+    <button class="backup-btn" id="switchAccountBtn">🔑 <span id="t-switchAccount">Switch Passcode</span></button>
+  </div>
+
+  <div class="sync-status">
+    <div class="sync-dot" id="syncDot"></div>
+    <span id="syncText">—</span>
+  </div>
+</div>
+
+<!-- Entry modal -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-date" id="modalDate">—</div>
+      <button class="modal-close" id="modalClose">×</button>
+    </div>
+    <label for="pnlInput" id="t-pnlLabel">P&amp;L (USD)</label>
+    <input type="number" id="pnlInput" step="0.01">
+    <label for="noteInput" id="t-noteLabel">Note</label>
+    <textarea id="noteInput" rows="4"></textarea>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="deleteBtn">Delete</button>
+      <button class="btn-primary" id="saveBtn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Month picker modal -->
+<div class="modal-overlay" id="pickerOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-date" id="t-pickerTitle">Select Month</div>
+      <button class="modal-close" id="pickerClose">×</button>
+    </div>
+    <div class="picker-year-row">
+      <button class="nav-btn" id="pickerPrevYear">‹</button>
+      <div class="picker-year-label" id="pickerYearLabel">2026</div>
+      <button class="nav-btn" id="pickerNextYear">›</button>
+    </div>
+    <div class="month-grid" id="monthGrid"></div>
+  </div>
+</div>
+
+<script>
+const ENTRIES_KEY = 'trading-entries';
+const SETTINGS_KEY = 'app-settings';
+
+const I18N = {
+  th: {
+    brandTitle: 'สมุดบันทึกกำไรขาดทุน', brandSub: 'หุ้นสหรัฐ',
+    tabCalendar: 'ปฏิทิน', tabYear: 'สรุปรายปี',
+    monthPnl: 'กำไร/ขาดทุนเดือนนี้', winDays: 'วันกำไร', lossDays: 'วันขาดทุน', winRate: 'อัตราชนะ',
+    today: 'วันนี้',
+    pnlLabel: 'กำไร/ขาดทุน (USD)', pnlPlaceholder: 'เช่น 150 หรือ -80',
+    noteLabel: 'บันทึกย่อ', notePlaceholder: 'เช่น Long AAPL ตาม breakout ออกเร็วไปนิด',
+    save: 'บันทึก', delete: 'ลบ',
+    yearPnl: 'กำไร/ขาดทุนรวมทั้งปี', tradingDays: 'วันที่เทรด', winRate2: 'อัตราชนะ',
+    bestDay: 'วันที่ดีที่สุด', worstDay: 'วันที่แย่ที่สุด', lossDays2: 'วันขาดทุน',
+    equityCurve: 'เส้นกราฟเงินทุนสะสม', monthlyBreakdown: 'สรุปรายเดือน',
+    noYearData: 'ยังไม่มีข้อมูลในปีนี้',
+    saveFail: 'บันทึกข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง',
+    pickerTitle: 'เลือกเดือน',
+    backupLabel: 'สำรองข้อมูล', exportBtn: 'ส่งออกไฟล์', importBtn: 'นำเข้าไฟล์',
+    importConfirm: 'ไฟล์นี้จะรวมเข้ากับข้อมูลปัจจุบันของคุณ (ถ้าวันที่ซ้ำกัน ข้อมูลในไฟล์จะทับของเดิม) ต้องการดำเนินการต่อหรือไม่?',
+    importSuccess: 'นำเข้าข้อมูลสำเร็จ', importFail: 'ไฟล์ไม่ถูกต้องหรือเสียหาย กรุณาตรวจสอบไฟล์อีกครั้ง',
+    switchAccount: 'เปลี่ยนรหัสลับ', continueBtn: 'เข้าใช้งาน',
+    passcodeTitle: 'ใส่รหัสลับ',
+    passcodeDesc: 'ตั้งรหัสลับของคุณเอง (แนะนำให้ยาวและคาดเดายาก เช่นวลีที่จำได้เฉพาะคุณ) ใช้รหัสเดียวกันทุกอุปกรณ์เพื่อดูข้อมูลชุดเดียวกัน',
+    passcodeLabel: 'รหัสลับ',
+    switchConfirm: 'ออกจากรหัสลับปัจจุบันบนอุปกรณ์นี้? คุณจะต้องใส่รหัสอีกครั้งเพื่อเข้าใช้งาน',
+    connectError: 'เชื่อมต่อฐานข้อมูลไม่สำเร็จ กรุณาตรวจสอบการตั้งค่า Firebase',
+    syncOnline: 'ซิงค์ข้อมูลบน Cloud สำเร็จ', syncOffline: 'ออฟไลน์ — บันทึกไว้ในเครื่องนี้เท่านั้น', syncConnecting: 'กำลังเชื่อมต่อ…',
+    months: ['มกราคม','กุมภาพันธ์','มีนาคม','เมษายน','พฤษภาคม','มิถุนายน','กรกฎาคม','สิงหาคม','กันยายน','ตุลาคม','พฤศจิกายน','ธันวาคม'],
+    monthsShort: ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.'],
+    weekdaysShort: ['จ','อ','พ','พฤ','ศ','ส','อา'],
+    weekdaysFull: ['วันจันทร์','วันอังคาร','วันพุธ','วันพฤหัสบดี','วันศุกร์','วันเสาร์','วันอาทิตย์'],
+    yearOffset: 543
+  },
+  en: {
+    brandTitle: 'Trading Journal', brandSub: 'US Stocks',
+    tabCalendar: 'Calendar', tabYear: 'Year Summary',
+    monthPnl: "This Month's P&L", winDays: 'Win Days', lossDays: 'Loss Days', winRate: 'Win Rate',
+    today: 'Today',
+    pnlLabel: 'P&L (USD)', pnlPlaceholder: 'e.g. 150 or -80',
+    noteLabel: 'Note', notePlaceholder: 'e.g. Long AAPL on breakout, exited too early',
+    save: 'Save', delete: 'Delete',
+    yearPnl: 'Total P&L This Year', tradingDays: 'Trading Days', winRate2: 'Win Rate',
+    bestDay: 'Best Day', worstDay: 'Worst Day', lossDays2: 'Loss Days',
+    equityCurve: 'Equity Curve', monthlyBreakdown: 'Monthly Breakdown',
+    noYearData: 'No data yet this year',
+    saveFail: 'Failed to save. Please try again.',
+    pickerTitle: 'Select Month',
+    backupLabel: 'Backup', exportBtn: 'Export File', importBtn: 'Import File',
+    importConfirm: 'This file will be merged into your current data (matching dates will be overwritten by the file). Continue?',
+    importSuccess: 'Data imported successfully', importFail: 'Invalid or corrupted file. Please check the file and try again.',
+    switchAccount: 'Switch Passcode', continueBtn: 'Continue',
+    passcodeTitle: 'Enter Passcode',
+    passcodeDesc: 'Set your own passcode (make it long and hard to guess, like a phrase only you know). Use the same passcode on every device to see the same data.',
+    passcodeLabel: 'Passcode',
+    switchConfirm: 'Sign out of the current passcode on this device? You will need to enter a passcode again to continue.',
+    connectError: 'Could not connect to the database. Please check your Firebase configuration.',
+    syncOnline: 'Cloud Sync Active', syncOffline: 'Offline — saved on this device only', syncConnecting: 'Connecting…',
+    months: ['January','February','March','April','May','June','July','August','September','October','November','December'],
+    monthsShort: ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
+    weekdaysShort: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+    weekdaysFull: ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'],
+    yearOffset: 0
+  }
+};
+
+let lang = 'en';
+let theme = 'dark';
+let entries = {};
+let current = new Date();
+let viewYear = current.getFullYear();
+let viewMonth = current.getMonth();
+let yearViewYear = current.getFullYear();
+let pickerYear = viewYear;
+let activeDate = null;
+let activeTab = 'calendar';
+
+function pad(n){ return String(n).padStart(2,'0'); }
+function dateKey(y,m,d){ return `${y}-${pad(m+1)}-${pad(d)}`; }
+function fmtMoney(n){
+  const sign = n < 0 ? '-' : '';
+  return sign + '$' + Math.abs(n).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+function t(key){ return I18N[lang][key]; }
+function yearLabel(y){ return y + t('yearOffset'); }
+
+/* =========================================================
+   FIREBASE: sync ข้อมูลด้วยรหัสลับ (ไม่ใช้อีเมล)
+   ผู้ใช้ตั้งรหัสลับเอง ใช้รหัสเดียวกันทุกอุปกรณ์เพื่อดูข้อมูลชุดเดียวกัน
+========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyCJjp24WvJeC_uK2amZw-pEOCUmlM23z5Q",
+  authDomain: "fam-trading-journey.firebaseapp.com",
+  projectId: "fam-trading-journey",
+  storageBucket: "fam-trading-journey.firebasestorage.app",
+  messagingSenderId: "1024872005870",
+  appId: "1:1024872005870:web:9c562de1e4eff4c195f3ff",
+  measurementId: "G-ZNP5QHTWVV"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+const db = firebase.firestore();
+
+const PASSCODE_KEY = 'trading-passcode-hash';
+let passHash = null;
+let unsubscribeSnapshot = null;
+
+async function sha256Hex(text){
+  const enc = new TextEncoder().encode(text);
+  const buf = await crypto.subtle.digest('SHA-256', enc);
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+function loadSavedPassHash(){
+  try{ return localStorage.getItem(PASSCODE_KEY); }catch(e){ return null; }
+}
+function savePassHash(hash){
+  try{ localStorage.setItem(PASSCODE_KEY, hash); }catch(e){ /* non critical */ }
+}
+function clearPassHash(){
+  try{ localStorage.removeItem(PASSCODE_KEY); }catch(e){ /* non critical */ }
+}
+
+function showPasscodeGate(){
+  document.getElementById('passcodeOverlay').classList.add('open');
+}
+function hidePasscodeGate(){
+  document.getElementById('passcodeOverlay').classList.remove('open');
+}
+
+function setSyncStatus(state){
+  const dot = document.getElementById('syncDot');
+  const textEl = document.getElementById('syncText');
+  dot.classList.remove('online', 'error');
+  if(state === 'online'){ dot.classList.add('online'); textEl.textContent = t('syncOnline'); }
+  else if(state === 'error'){ dot.classList.add('error'); textEl.textContent = t('syncOffline'); }
+  else if(state === 'connecting'){ textEl.textContent = t('syncConnecting'); }
+  else{ textEl.textContent = t('syncOffline'); }
+}
+
+async function ensureAnonAuth(){
+  if(fbAuth.currentUser) return true;
+  try{
+    await fbAuth.signInAnonymously();
+    return true;
+  }catch(e){
+    console.error('Anonymous sign-in failed', e);
+    setSyncStatus('error');
+    alert(t('connectError'));
+    return false;
+  }
+}
+
+function listenToTradingData(hash){
+  if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  const docRef = db.collection('journals').doc(hash);
+  unsubscribeSnapshot = docRef.onSnapshot((docSnap) => {
+    entries = (docSnap.exists && docSnap.data().entries) ? docSnap.data().entries : {};
+    try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }catch(e){ /* non critical */ }
+    setSyncStatus('online');
+    renderCalendar();
+    if(activeTab === 'year') renderYearView();
+  }, (error) => {
+    console.error('Firestore sync error', error);
+    setSyncStatus('error');
+  });
+}
+
+async function connectWithPasscode(rawPasscode){
+  const passcode = (rawPasscode || '').trim();
+  if(!passcode) return;
+  setSyncStatus('connecting');
+  const hash = await sha256Hex(passcode);
+  const ok = await ensureAnonAuth();
+  if(!ok) return;
+  passHash = hash;
+  savePassHash(hash);
+  listenToTradingData(hash);
+  hidePasscodeGate();
+}
+
+function switchAccount(){
+  if(!confirm(t('switchConfirm'))) return;
+  if(unsubscribeSnapshot){ unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+  passHash = null;
+  clearPassHash();
+  entries = {};
+  document.getElementById('passcodeInput').value = '';
+  renderCalendar();
+  if(activeTab === 'year') renderYearView();
+  showPasscodeGate();
+}
+
+async function loadEntries(){
+  try{
+    const raw = localStorage.getItem(ENTRIES_KEY);
+    entries = raw ? JSON.parse(raw) : {};
+  }catch(e){ entries = {}; }
+}
+async function persistEntries(){
+  try{ localStorage.setItem(ENTRIES_KEY, JSON.stringify(entries)); }
+  catch(e){ console.error(e); alert(t('saveFail')); }
+
+  if(passHash){
+    try{
+      await db.collection('journals').doc(passHash).set({ entries }, { merge:true });
+    }catch(e){
+      console.error('Firestore save error', e);
+      setSyncStatus('error');
+    }
+  }
+}
+async function loadSettings(){
+  try{
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    const s = raw ? JSON.parse(raw) : {};
+    if(s.lang) lang = s.lang;
+    if(s.theme) theme = s.theme;
+  }catch(e){ /* defaults */ }
+}
+async function persistSettings(){
+  try{ localStorage.setItem(SETTINGS_KEY, JSON.stringify({lang, theme})); }
+  catch(e){ /* non critical */ }
+}
+
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', theme);
+  document.getElementById('themeLight').classList.toggle('active', theme === 'light');
+  document.getElementById('themeDark').classList.toggle('active', theme === 'dark');
+}
+
+function applyStaticTranslations(){
+  document.getElementById('t-brandTitle').textContent = t('brandTitle');
+  document.getElementById('t-brandSub').textContent = t('brandSub');
+  document.getElementById('t-tabCalendar').textContent = t('tabCalendar');
+  document.getElementById('t-tabYear').textContent = t('tabYear');
+  document.getElementById('t-monthPnl').textContent = t('monthPnl');
+  document.getElementById('t-winDays').textContent = t('winDays');
+  document.getElementById('t-lossDays').textContent = t('lossDays');
+  document.getElementById('t-winRate').textContent = t('winRate');
+  document.getElementById('todayBtn').textContent = t('today');
+  document.getElementById('t-pnlLabel').textContent = t('pnlLabel');
+  document.getElementById('pnlInput').placeholder = t('pnlPlaceholder');
+  document.getElementById('t-noteLabel').textContent = t('noteLabel');
+  document.getElementById('noteInput').placeholder = t('notePlaceholder');
+  document.getElementById('saveBtn').textContent = t('save');
+  document.getElementById('deleteBtn').textContent = t('delete');
+  document.getElementById('t-yearPnl').textContent = t('yearPnl');
+  document.getElementById('t-tradingDays').textContent = t('tradingDays');
+  document.getElementById('t-winRate2').textContent = t('winRate2');
+  document.getElementById('t-bestDay').textContent = t('bestDay');
+  document.getElementById('t-worstDay').textContent = t('worstDay');
+  document.getElementById('t-lossDays2').textContent = t('lossDays2');
+  document.getElementById('t-equityCurve').textContent = t('equityCurve');
+  document.getElementById('t-monthlyBreakdown').textContent = t('monthlyBreakdown');
+  document.getElementById('t-pickerTitle').textContent = t('pickerTitle');
+  document.getElementById('t-backupLabel').textContent = t('backupLabel');
+  document.getElementById('t-exportBtn').textContent = t('exportBtn');
+  document.getElementById('t-importBtn').textContent = t('importBtn');
+  document.getElementById('t-switchAccount').textContent = t('switchAccount');
+  document.getElementById('t-passcodeTitle').textContent = t('passcodeTitle');
+  document.getElementById('t-passcodeDesc').textContent = t('passcodeDesc');
+  document.getElementById('t-passcodeLabel').textContent = t('passcodeLabel');
+  document.getElementById('passcodeContinue').textContent = t('continueBtn') || (lang==='th' ? 'เข้าใช้งาน' : 'Continue');
+
+  const dot = document.getElementById('syncDot');
+  const syncTextEl = document.getElementById('syncText');
+  if(dot.classList.contains('online')) syncTextEl.textContent = t('syncOnline');
+  else if(dot.classList.contains('error')) syncTextEl.textContent = t('syncOffline');
+  else syncTextEl.textContent = passHash ? t('syncConnecting') : t('syncOffline');
+
+  document.getElementById('langTH').classList.toggle('active', lang==='th');
+  document.getElementById('langEN').classList.toggle('active', lang==='en');
+
+  const wdRow = document.getElementById('weekdaysRow');
+  wdRow.innerHTML = '';
+  t('weekdaysShort').forEach(w => {
+    const d = document.createElement('div');
+    d.textContent = w;
+    wdRow.appendChild(d);
+  });
+}
+
+/* ---------- CALENDAR ---------- */
+function renderCalendar(){
+  document.getElementById('monthTitleBtn').textContent = `${t('months')[viewMonth]} ${yearLabel(viewYear)}`;
+
+  const grid = document.getElementById('calendarGrid');
+  grid.innerHTML = '';
+
+  const firstOfMonth = new Date(viewYear, viewMonth, 1);
+  let leading = (firstOfMonth.getDay() + 6) % 7;
+  const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
+  const todayKey = dateKey(current.getFullYear(), current.getMonth(), current.getDate());
+
+  for(let i=0; i<leading; i++){
+    const empty = document.createElement('div');
+    empty.className = 'day-cell empty';
+    grid.appendChild(empty);
+  }
+
+  for(let d=1; d<=daysInMonth; d++){
+    const key = dateKey(viewYear, viewMonth, d);
+    const cell = document.createElement('div');
+    cell.className = 'day-cell';
+    cell.tabIndex = 0;
+
+    const dow = (new Date(viewYear, viewMonth, d).getDay() + 6) % 7;
+    if(dow >= 5) cell.classList.add('weekend');
+    if(key === todayKey) cell.classList.add('today');
+
+    const entry = entries[key];
+    if(entry){
+      const amt = Number(entry.amount) || 0;
+      if(amt > 0) cell.classList.add('has-gain');
+      else if(amt < 0) cell.classList.add('has-loss');
+    }
+
+    const num = document.createElement('div');
+    num.className = 'day-num';
+    num.textContent = d;
+    cell.appendChild(num);
+
+    if(entry && entry.amount){
+      const amt = Number(entry.amount) || 0;
+      const amountEl = document.createElement('div');
+      amountEl.className = 'day-amount ' + (amt >= 0 ? 'gain' : 'loss');
+      amountEl.textContent = fmtMoney(amt);
+      cell.appendChild(amountEl);
+    }
+    if(entry && entry.note){
+      const dot = document.createElement('div');
+      dot.className = 'day-note-dot';
+      cell.appendChild(dot);
+    }
+
+    cell.addEventListener('click', () => openModal(viewYear, viewMonth, d));
+    cell.addEventListener('keydown', (e) => {
+      if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); openModal(viewYear, viewMonth, d); }
+    });
+
+    grid.appendChild(cell);
+  }
+  renderMonthSummary();
+}
+
+function renderMonthSummary(){
+  const prefix = `${viewYear}-${pad(viewMonth+1)}-`;
+  let total = 0, wins = 0, losses = 0;
+  Object.keys(entries).forEach(k => {
+    if(k.startsWith(prefix)){
+      const amt = Number(entries[k].amount) || 0;
+      if(amt !== 0){ total += amt; if(amt > 0) wins++; else losses++; }
+    }
+  });
+  const totalEl = document.getElementById('monthTotal');
+  totalEl.textContent = fmtMoney(total);
+  totalEl.style.color = total > 0 ? 'var(--gain)' : (total < 0 ? 'var(--loss)' : 'var(--text)');
+  document.getElementById('winDays').textContent = wins;
+  document.getElementById('lossDays').textContent = losses;
+  const traded = wins + losses;
+  document.getElementById('winRate').textContent = traded ? Math.round((wins/traded)*100) + '%' : '0%';
+}
+
+/* ---------- ENTRY MODAL ---------- */
+function openModal(y, m, d){
+  activeDate = dateKey(y, m, d);
+  const dateObj = new Date(y, m, d);
+  const wd = t('weekdaysFull')[(dateObj.getDay() + 6) % 7];
+  const dateStr = lang === 'th'
+    ? `${wd}ที่ ${d} ${t('months')[m]} ${yearLabel(y)}`
+    : `${wd}, ${t('months')[m]} ${d}, ${yearLabel(y)}`;
+  document.getElementById('modalDate').textContent = dateStr;
+
+  const entry = entries[activeDate];
+  document.getElementById('pnlInput').value = entry && entry.amount != null ? entry.amount : '';
+  document.getElementById('noteInput').value = entry && entry.note ? entry.note : '';
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('pnlInput').focus(), 50);
+}
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  activeDate = null;
+}
+async function saveEntry(){
+  if(!activeDate) return;
+  const amountRaw = document.getElementById('pnlInput').value.trim();
+  const note = document.getElementById('noteInput').value.trim();
+  if(amountRaw === '' && note === ''){ delete entries[activeDate]; }
+  else{ entries[activeDate] = { amount: amountRaw === '' ? 0 : parseFloat(amountRaw), note }; }
+  await persistEntries();
+  renderCalendar();
+  if(activeTab === 'year') renderYearView();
+  closeModal();
+}
+async function deleteEntry(){
+  if(!activeDate) return;
+  delete entries[activeDate];
+  await persistEntries();
+  renderCalendar();
+  if(activeTab === 'year') renderYearView();
+  closeModal();
+}
+
+/* ---------- MONTH PICKER ---------- */
+function openPicker(){
+  pickerYear = viewYear;
+  renderPicker();
+  document.getElementById('pickerOverlay').classList.add('open');
+}
+function closePicker(){ document.getElementById('pickerOverlay').classList.remove('open'); }
+function renderPicker(){
+  document.getElementById('pickerYearLabel').textContent = yearLabel(pickerYear);
+  const grid = document.getElementById('monthGrid');
+  grid.innerHTML = '';
+  t('monthsShort').forEach((m, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'month-opt';
+    if(pickerYear === viewYear && i === viewMonth) btn.classList.add('current');
+    btn.textContent = m;
+    btn.addEventListener('click', () => {
+      viewYear = pickerYear; viewMonth = i;
+      renderCalendar();
+      closePicker();
+    });
+    grid.appendChild(btn);
+  });
+}
+
+/* ---------- YEAR VIEW ---------- */
+function renderYearView(){
+  document.getElementById('yearTitle').textContent = String(yearLabel(yearViewYear));
+
+  const prefix = `${yearViewYear}-`;
+  const yearEntries = Object.keys(entries)
+    .filter(k => k.startsWith(prefix))
+    .map(k => ({ date: k, amount: Number(entries[k].amount) || 0 }))
+    .filter(e => e.amount !== 0)
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  let total = 0, wins = 0, losses = 0, best = null, worst = null;
+  yearEntries.forEach(e => {
+    total += e.amount;
+    if(e.amount > 0) wins++; else losses++;
+    if(best === null || e.amount > best.amount) best = e;
+    if(worst === null || e.amount < worst.amount) worst = e;
+  });
+  const traded = wins + losses;
+
+  const totalEl = document.getElementById('yearTotal');
+  totalEl.textContent = fmtMoney(total);
+  totalEl.style.color = total > 0 ? 'var(--gain)' : (total < 0 ? 'var(--loss)' : 'var(--text)');
+  document.getElementById('yearTradingDays').textContent = traded;
+  document.getElementById('yearWinRate').textContent = traded ? Math.round((wins/traded)*100) + '%' : '0%';
+  document.getElementById('yearBest').textContent = best ? fmtMoney(best.amount) : '$0.00';
+  document.getElementById('yearWorst').textContent = worst ? fmtMoney(worst.amount) : '$0.00';
+  document.getElementById('yearLossDays').textContent = losses;
+
+  renderEquityCurve(yearEntries);
+  renderMonthlyBars(yearEntries);
+}
+
+function renderEquityCurve(yearEntries){
+  const wrap = document.getElementById('equityChartWrap');
+  if(yearEntries.length === 0){
+    wrap.innerHTML = `<div class="empty-state">${t('noYearData')}</div>`;
+    return;
+  }
+  let cum = 0;
+  const points = yearEntries.map(e => { cum += e.amount; return cum; });
+
+  const W = 640, H = 200, padL = 46, padR = 12, padT = 14, padB = 14;
+  const minV = Math.min(0, ...points);
+  const maxV = Math.max(0, ...points);
+  const range = (maxV - minV) || 1;
+
+  const xStep = points.length > 1 ? (W - padL - padR) / (points.length - 1) : 0;
+  const yFor = v => padT + (H - padT - padB) * (1 - (v - minV) / range);
+  const xFor = i => padL + xStep * i;
+
+  const coords = points.map((v,i) => [xFor(i), yFor(v)]);
+  const linePath = coords.map((c,i) => (i===0?'M':'L') + c[0].toFixed(1) + ',' + c[1].toFixed(1)).join(' ');
+  const areaPath = linePath + ` L${coords[coords.length-1][0].toFixed(1)},${yFor(0).toFixed(1)} L${coords[0][0].toFixed(1)},${yFor(0).toFixed(1)} Z`;
+
+  const zeroY = yFor(0).toFixed(1);
+  const lastVal = points[points.length-1];
+  const lineColorVar = lastVal >= 0 ? 'var(--gain)' : 'var(--loss)';
+  const fillHex = lastVal >= 0 ? (theme==='dark' ? '#4FBE83' : '#1E9E63') : (theme==='dark' ? '#E8695A' : '#E14F3D');
+  const gridHex = theme === 'dark' ? '#303640' : '#E7E6E1';
+  const dimHex = theme === 'dark' ? '#93989F' : '#83837C';
+  const last = coords[coords.length-1];
+
+  const svg = `
+  <svg class="equity-svg" viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${fillHex}" stop-opacity="0.18"/>
+        <stop offset="100%" stop-color="${fillHex}" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <line x1="${padL}" y1="${zeroY}" x2="${W-padR}" y2="${zeroY}" stroke="${gridHex}" stroke-width="1" stroke-dasharray="4,4"/>
+    <text x="4" y="${Number(zeroY)+4}" font-family="IBM Plex Mono, monospace" font-size="10" fill="${dimHex}">$0</text>
+    <text x="4" y="${padT+8}" font-family="IBM Plex Mono, monospace" font-size="10" fill="${dimHex}">${fmtMoney(maxV)}</text>
+    <text x="4" y="${H-padB}" font-family="IBM Plex Mono, monospace" font-size="10" fill="${dimHex}">${fmtMoney(minV)}</text>
+    <path d="${areaPath}" fill="url(#eqFill)" />
+    <path d="${linePath}" fill="none" stroke="${fillHex}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+    <circle cx="${last[0].toFixed(1)}" cy="${last[1].toFixed(1)}" r="3.5" fill="${fillHex}" />
+  </svg>`;
+  wrap.innerHTML = svg;
+}
+
+function renderMonthlyBars(yearEntries){
+  const wrap = document.getElementById('barChartWrap');
+  const monthTotals = new Array(12).fill(0);
+  yearEntries.forEach(e => {
+    const m = parseInt(e.date.split('-')[1], 10) - 1;
+    monthTotals[m] += e.amount;
+  });
+  const maxAbs = Math.max(1, ...monthTotals.map(v => Math.abs(v)));
+
+  let html = '<div class="bar-chart">';
+  monthTotals.forEach((v, i) => {
+    const heightPct = v === 0 ? 3 : Math.max(4, Math.round((Math.abs(v) / maxAbs) * 100));
+    const cls = v > 0 ? 'gain' : (v < 0 ? 'loss' : 'zero');
+    html += `<div class="bar-col" title="${t('monthsShort')[i]}: ${fmtMoney(v)}">
+        <div class="bar ${cls}" style="height:${heightPct}%"></div>
+        <div class="bar-label">${t('monthsShort')[i]}</div>
+      </div>`;
+  });
+  html += '</div>';
+  wrap.innerHTML = html;
+}
+
+/* ---------- BACKUP: EXPORT / IMPORT ---------- */
+function exportData(){
+  const payload = {
+    app: 'trading-journal',
+    exportedAt: new Date().toISOString(),
+    entries: entries,
+    settings: { lang, theme }
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date();
+  a.href = url;
+  a.download = `trading-journal-backup-${today.getFullYear()}${pad(today.getMonth()+1)}${pad(today.getDate())}.json`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function handleImportFile(file){
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    try{
+      const data = JSON.parse(e.target.result);
+      const incoming = data.entries && typeof data.entries === 'object' ? data.entries : data;
+      if(!incoming || typeof incoming !== 'object') throw new Error('bad format');
+
+      if(!confirm(t('importConfirm'))) return;
+
+      Object.assign(entries, incoming);
+      await persistEntries();
+      renderCalendar();
+      if(activeTab === 'year') renderYearView();
+      alert(t('importSuccess'));
+    }catch(err){
+      console.error(err);
+      alert(t('importFail'));
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('exportBtn').addEventListener('click', exportData);
+document.getElementById('importBtnUI').addEventListener('click', () => {
+  document.getElementById('importFileInput').click();
+});
+document.getElementById('importFileInput').addEventListener('change', (e) => {
+  const file = e.target.files[0];
+  if(file) handleImportFile(file);
+  e.target.value = '';
+});
+
+/* ---------- EVENTS ---------- */
+document.getElementById('prevMonthBtn').addEventListener('click', () => {
+  viewMonth--; if(viewMonth < 0){ viewMonth = 11; viewYear--; } renderCalendar();
+});
+document.getElementById('nextMonthBtn').addEventListener('click', () => {
+  viewMonth++; if(viewMonth > 11){ viewMonth = 0; viewYear++; } renderCalendar();
+});
+document.getElementById('todayBtn').addEventListener('click', () => {
+  viewYear = current.getFullYear(); viewMonth = current.getMonth(); renderCalendar();
+});
+document.getElementById('monthTitleBtn').addEventListener('click', openPicker);
+document.getElementById('pickerClose').addEventListener('click', closePicker);
+document.getElementById('pickerOverlay').addEventListener('click', (e) => { if(e.target.id === 'pickerOverlay') closePicker(); });
+document.getElementById('pickerPrevYear').addEventListener('click', () => { pickerYear--; renderPicker(); });
+document.getElementById('pickerNextYear').addEventListener('click', () => { pickerYear++; renderPicker(); });
+
+document.getElementById('prevYearBtn').addEventListener('click', () => { yearViewYear--; renderYearView(); });
+document.getElementById('nextYearBtn').addEventListener('click', () => { yearViewYear++; renderYearView(); });
+
+document.getElementById('modalClose').addEventListener('click', closeModal);
+document.getElementById('modalOverlay').addEventListener('click', (e) => { if(e.target.id === 'modalOverlay') closeModal(); });
+document.getElementById('saveBtn').addEventListener('click', saveEntry);
+document.getElementById('deleteBtn').addEventListener('click', deleteEntry);
+
+document.getElementById('tabCalendarBtn').addEventListener('click', () => {
+  activeTab = 'calendar';
+  document.getElementById('tabCalendarBtn').classList.add('active');
+  document.getElementById('tabYearBtn').classList.remove('active');
+  document.getElementById('calendarView').classList.remove('hidden');
+  document.getElementById('yearView').classList.add('hidden');
+});
+document.getElementById('tabYearBtn').addEventListener('click', () => {
+  activeTab = 'year';
+  document.getElementById('tabYearBtn').classList.add('active');
+  document.getElementById('tabCalendarBtn').classList.remove('active');
+  document.getElementById('yearView').classList.remove('hidden');
+  document.getElementById('calendarView').classList.add('hidden');
+  renderYearView();
+});
+
+async function switchLang(newLang){
+  if(lang === newLang) return;
+  lang = newLang;
+  applyStaticTranslations();
+  renderCalendar();
+  if(activeTab === 'year') renderYearView();
+  await persistSettings();
+}
+document.getElementById('langTH').addEventListener('click', () => switchLang('th'));
+document.getElementById('langEN').addEventListener('click', () => switchLang('en'));
+
+async function switchTheme(newTheme){
+  if(theme === newTheme) return;
+  theme = newTheme;
+  applyTheme();
+  if(activeTab === 'year') renderYearView();
+  await persistSettings();
+}
+document.getElementById('themeLight').addEventListener('click', () => switchTheme('light'));
+document.getElementById('themeDark').addEventListener('click', () => switchTheme('dark'));
+
+document.getElementById('passcodeContinue').addEventListener('click', () => {
+  const val = document.getElementById('passcodeInput').value;
+  if(!val.trim()) return;
+  connectWithPasscode(val);
+});
+document.getElementById('passcodeInput').addEventListener('keydown', (e) => {
+  if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('passcodeContinue').click(); }
+});
+document.getElementById('switchAccountBtn').addEventListener('click', switchAccount);
+
+(async function init(){
+  await loadSettings();
+  await loadEntries();
+  applyTheme();
+  applyStaticTranslations();
+  renderCalendar();
+
+  const savedHash = loadSavedPassHash();
+  if(savedHash){
+    passHash = savedHash;
+    hidePasscodeGate();
+    setSyncStatus('connecting');
+    const ok = await ensureAnonAuth();
+    if(ok) listenToTradingData(savedHash);
+  } else {
+    showPasscodeGate();
+    setSyncStatus('idle');
+    setTimeout(() => document.getElementById('passcodeInput').focus(), 100);
+  }
+})();
+</script>
+</body>
+</html>
